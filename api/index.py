@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import os
+import re
 from app.logic import transcribe_audio, extract_fields, save_record
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -29,7 +30,20 @@ async def process_form(
 ):
     os.makedirs("uploads", exist_ok=True)
 
-    file_path = f"uploads/{audiofile.filename}"
+    # Derive safe filename with correct extension from content-type
+    # (browser-recorded blobs arrive with a generic name like 'blob')
+    content_type = audiofile.content_type or ''
+    if 'mp4' in content_type:
+        ext = '.mp4'
+    elif 'ogg' in content_type:
+        ext = '.ogg'
+    else:
+        ext = '.webm'
+
+    raw_base = os.path.splitext(audiofile.filename or 'recording')[0]
+    safe_base = re.sub(r'[^a-zA-Z0-9_-]', '_', raw_base)[:64] or 'recording'
+    file_path = os.path.join("uploads", safe_base + ext)
+
     with open(file_path, "wb") as f:
         f.write(await audiofile.read())
 
